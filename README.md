@@ -8,8 +8,10 @@ A local-first document review workflow for synthetic academic compliance applica
 4. Run explainable rule, cross-document, duplicate, and mock-issuer checks.
 5. Review extracted fields and findings.
 6. Confirm required evidence fields and resolve high-severity findings before approval.
-7. Submit the completed application for a System Administrator decision.
-8. Record an approval or rejection in a hash-linked audit trail and provide the institution with a decision report.
+7. Submit the completed application to the AICTE Scrutiny Officer queue for a final decision.
+8. A System Administrator may request corrections; the Scrutiny Officer records
+   the final approval/rejection in a hash-linked audit trail, and the institution
+   receives a decision report.
 
 This is a demonstration system. Rules and issuer checks are synthetic and must not
 be used to make real accreditation decisions.
@@ -44,9 +46,11 @@ and only for active accounts that still have those seeded passwords. Do not
 enable demo mode in production; existing accounts are never overwritten.
 Administrators can create accounts, change roles, and disable or enable users
 from the System Administrator dashboard.
-The sign-in screen also lets institutions register directly. Public registration
-always assigns the least-privilege Institution Applicant role and requires a
-12-character password; applicants can access only their own applications.
+The sign-in screen lets institutions request an account using a 12-character
+password. A request appears in the System Administrator dashboard; no login
+account is created until an administrator approves it. Approved accounts
+receive only the Institution Applicant role and can access only their own
+applications.
 
 The administrator dashboard manages accounts and shows audit integrity and
 security status. The AICTE Scrutiny Officer dashboard prioritizes applications
@@ -58,14 +62,17 @@ rules, and submit proposals for independent System Administrator approval.
 Approvals publish immutable new versions; prior versions and previously
 recorded evaluation findings remain unchanged. Rule drafts, source attestations,
 simulations, submissions, approvals, and rejections are recorded in the audit
-trail. The AICTE Scrutiny Officer may review applications but cannot create new
+trail. The AICTE Scrutiny Officer may review applications and make final
+decisions on submitted institution applications, but cannot create new
 applications.
 Institutions can run an advisory metadata pre-check before creating an
 application, edit their own draft details, upload typed evidence, and view
 missing-document and validation guidance. After all uploaded documents finish
-processing, an institution submits the application into the System
-Administrator decision queue. Submitted applications are locked against
-institution edits; AICTE Scrutiny Officers cannot issue their final decisions.
+processing, an institution submits the application into the AICTE Scrutiny
+Officer decision queue. If corrections are requested by a System Administrator,
+the institution can edit its details or evidence and resubmit. Other submitted
+applications remain locked against institution edits until a decision is
+recorded.
 After approval or rejection, the institution receives an owner-scoped decision
 report with the outcome, note, decision maker/date, score summary, evidence,
 and findings; the report can be printed or saved as PDF. A rejected application
@@ -79,6 +86,21 @@ automatically retrieve or verify AICTE amendments, and does not use a
 generative-AI model to write scrutiny reports. Reports are produced by OCR,
 cross-document consistency checks, and the configured rule engine. Authorized
 staff must verify official regulatory sources before adding production rules.
+Text-bearing PDFs use native text extraction; image-based pages and text-free
+vector pages are sent through Tesseract OCR. Unreadable documents are marked
+failed rather than processed. Extracted field labels are matched against known
+variants with TF-IDF, and extraction responses include source page references.
+The compliance score weights metadata consistency, required-document
+completeness, and regulatory compliance. Configure weights, the advisory
+approval threshold, and required document types with
+`COMPLIANCE_WEIGHT_METADATA_CONSISTENCY`,
+`COMPLIANCE_WEIGHT_DOCUMENT_COMPLETENESS`,
+`COMPLIANCE_WEIGHT_REGULATORY_COMPLIANCE`,
+`COMPLIANCE_APPROVE_THRESHOLD`, and
+`COMPLIANCE_REQUIRED_DOCUMENT_TYPES`. The score and recommendation are
+explainable and advisory; an authorized reviewer records the final decision.
+Rejections require a reason, and correction requests and status transitions are
+recorded in the audit trail.
 
 Uploaded files and the SQLite database are stored under `backend/storage/`.
 
@@ -250,12 +272,21 @@ PostgreSQL provider and a **private** Blob store, and configure these project
 environment variables for Production and Preview:
 
 - `DATABASE_URL`: provider's PostgreSQL URL (use its non-pooling URL if offered).
+- Connect the **private** Blob store to the Vercel project. Production uploads
+  use its OIDC-connected `BLOB_STORE_ID`, and the backend needs
+  `BLOB_READ_WRITE_TOKEN` (or a backend-provided `VERCEL_OIDC_TOKEN`) to read
+  and process private evidence. Do not use a public Blob store token for evidence.
 - `SECRET_KEY`: a stable, randomly generated signing key (at least 32 random
   bytes); keep it private and do not commit it.
 - `ADMIN_PASSWORD`: a strong initial System Administrator password.
 - `DOCUMENT_STORAGE=vercel_blob`.
 - `DEMO_MODE=false`.
 - `NEXT_PUBLIC_BLOB_UPLOADS=true`.
+- `SAMPLE_APPLICATIONS_ENABLED=true` only when the production project is being
+  used for a demonstration. This creates two clearly labeled synthetic outcome
+  examples under the seeded `institution` account: one approved and one
+  rejected. They contain no evidence, are not official AICTE decisions, and are
+  visible in the institution account and AICTE Scrutiny Officer dashboard.
 
 Optional bootstrap role passwords are `OFFICER_PASSWORD`,
 `REGULATORY_PASSWORD`, `COMPLIANCE_ADMIN_PASSWORD`, and
@@ -288,5 +319,4 @@ The project uses the backend Dockerfile so scanned-PDF OCR keeps its Tesseract
 runtime. A Vercel-managed `*.vercel.app` domain is assigned to the project;
 add a custom domain separately if desired. Do not use this demonstration
 application for official accreditation decisions.
-#   R e g u l a S h i e l d  
- 
+#
